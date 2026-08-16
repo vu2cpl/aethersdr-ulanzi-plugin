@@ -1,5 +1,7 @@
 # aethersdr-ulanzi-plugin
 
+[![Available on Ulanzi Community Store](https://raw.githubusercontent.com/narlei/ulanzicommunitystore/main/docs/badges/ulanzi-community-store.svg)](https://ulanzicommunitystore.narlei.com)
+
 [Ulanzi Studio](https://www.ulanzi.com/) plugin that drives [AetherSDR](https://github.com/aethersdr/AetherSDR) — a multi-platform SDR client for FlexRadio transceivers — from a Ulanzi macro keypad or dial.  Bridges the **Ulanzi SDK** (which talks to the physical device over Bluetooth) to **AetherSDR's TCI WebSocket** (the radio control protocol on port 40001).
 
 Tested on the **Ulanzi D100H / KEHWIN Dial_Lite** (6 keys + 1 dial, BLE HOGP).  Should also work with any other Ulanzi-Studio-compatible device — LCD keypads etc — using the keypad actions.
