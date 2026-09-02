@@ -2,33 +2,37 @@
 
 [![Available on Ulanzi Community Store](https://raw.githubusercontent.com/narlei/ulanzicommunitystore/main/docs/badges/ulanzi-community-store.svg)](https://ulanzicommunitystore.narlei.com)
 
-[Ulanzi Studio](https://www.ulanzi.com/) plugin that drives [AetherSDR](https://github.com/aethersdr/AetherSDR) — a multi-platform SDR client for FlexRadio transceivers — from a Ulanzi macro keypad or dial.  Bridges the **Ulanzi SDK** (which talks to the physical device over Bluetooth) to **AetherSDR's TCI WebSocket** (the radio control protocol on port 40001).
+[Ulanzi Studio](https://www.ulanzi.com/) plugin that drives [AetherSDR](https://github.com/aethersdr/AetherSDR) — a multi-platform SDR client for FlexRadio transceivers — from a Ulanzi macro keypad or dial.  Bridges the **Ulanzi SDK** (which talks to the physical device over Bluetooth) to **AetherSDR's TCI WebSocket** (the radio control protocol on port 50001).
 
 Tested on the **Ulanzi D100H / KEHWIN Dial_Lite** (6 keys + 1 dial, BLE HOGP).  Should also work with any other Ulanzi-Studio-compatible device — LCD keypads etc — using the keypad actions.
 
 ## Actions
 
-18 actions total — D100H profile uses 8 of them (one dial + 7 keys), D200H/D200X profiles fan out to the wider set.
+22 actions total — D100H profile uses 8 of them (one dial + 7 keys), D200H/D200X profiles fan out to the wider set, including the rotary knobs.
 
 | Action | Controllers | What it does |
 |---|---|---|
-| **VFO Tune** | Encoder (dial) | Rotate → step the active slice frequency; press+rotate → coarse step (×10/×100/×1000); press → user-configurable (default MOX toggle) |
+| **VFO Tune** | Encoder (dial) | Rotate → step the active slice frequency; press+rotate → coarse step; press → MOX toggle |
+| **AF Gain / RF Power / Mic Gain (dial)** | Encoder (dial) | Rotate to adjust 0–100; press+rotate = coarse. Knob press is a deliberate no-op so a level knob can never key TX |
+| **Filter Width (dial)** | Encoder (dial) | Widen / narrow the RX passband symmetrically about its centre — TCI `rx_filter_band:` |
+| **Squelch Level (dial)** | Encoder (dial) | Squelch threshold — TCI `sql_level:` |
 | **MOX Toggle** | Keypad | Toggle MOX (Manual transmit) on the active slice |
 | **TUNE / ATU** | Keypad | Start an internal-ATU tune cycle |
 | **Mode Cycle** | Keypad | USB → LSB → CW → DIGU → DIGL → AM → FM → wrap |
 | **Mode USB / LSB / CW / DIGU** | Keypad | Direct-set modulation (one action per mode — for devices with enough keys to skip cycling) |
 | **Band Up / Band Down** | Keypad | Jump to next higher/lower amateur band |
-| **Slice Cycle** | Keypad | A → B → C → … → H → A |
 | **RIT Toggle** | Keypad | Toggle Receiver Incremental Tuning on the active slice |
-| **AF Gain Up / Down** | Keypad | Step audio (volume) gain ±5 — TCI `volume:` verb |
+| **AF Gain Up / Down** | Keypad | Step audio (volume) gain ±5 — TCI `volume:` verb (dB on the wire, percent in the plugin) |
 | **RF Gain Up / Down** | Keypad | Step RF drive (TX power) ±5 — TCI `drive:` verb |
-| **Mic Gain Up / Down** | Keypad | Step mic level ±5 — TCI `mic_level:` verb (non-standard; may be silently ignored by AetherSDR) |
+| **Mic Gain Up / Down** | Keypad | Step mic level ±5 — TCI `mic_level:` verb (AetherSDR extension, verified live) |
 
-Per-action property inspector lets you override the AetherSDR TCI URL, step sizes for VFO, dial-press behaviour, etc.
+Each action's property inspector lets you override the AetherSDR TCI URL. One shared TCI connection serves every action; changing the URL reconnects them all.
+
+*Slice Cycle was removed in 0.1.7: TCI has no slice-focus verb (the `if:` verb it was sending is IF-offset). Use AetherSDR's keyboard shortcut for next/previous slice via Studio's built-in Hotkey action instead.*
 
 ### Button icons
 
-All 18 action icons are generated programmatically from [`scripts/Generate-Icons.ps1`](scripts/Generate-Icons.ps1) — pure PowerShell + System.Drawing, no npm / Node, idempotent.  Edit the `$ICONS` list at the top of the script, run `pwsh scripts/Generate-Icons.ps1`, and every PNG in `assets/icons/` is rewritten at the Ulanzi-standard 196×196 with the AetherSDR theme palette (TX-red, RX-green, band-blue, gain-purple, spectrum-cyan).  Operator can still override per-key with a custom image via Studio's right-click menu.
+All action icons are generated programmatically from [`scripts/Generate-Icons.ps1`](scripts/Generate-Icons.ps1) — pure PowerShell + System.Drawing, no npm / Node, idempotent.  Edit the `$ICONS` list at the top of the script, run `pwsh scripts/Generate-Icons.ps1`, and every PNG in `assets/icons/` is rewritten at the Ulanzi-standard 196×196 with the AetherSDR theme palette (TX-red, RX-green, band-blue, gain-purple, spectrum-cyan).  Operator can still override per-key with a custom image via Studio's right-click menu.
 
 The 196×196 PNG format matches Ulanzi Studio's own marketplace icon convention — text + glyphs are baked into the pixel data so the device LCD renders them crisp without relying on Studio's title-overlay (which strips when icons are SVG).  *Currently Windows-only since System.Drawing is GDI+-based; cross-platform regeneration is a future improvement (porting to ImageMagick / SkiaSharp).*
 
@@ -56,7 +60,7 @@ Launcher tiles use a deliberately different visual language from the radio-contr
 │  LCD keypad         │             │  (Windows / macOS)  │  127.0.0.1:3906 │  (Node.js)          │
 └─────────────────────┘             └─────────────────────┘                 └──────────┬──────────┘
                                                                                        │ WebSocket
-                                                                                       │ ws://<host>:40001
+                                                                                       │ ws://<host>:50001
                                                                                        ▼
                                                                             ┌─────────────────────┐
                                                                             │  AetherSDR          │
@@ -69,14 +73,14 @@ The plugin runs as a Node.js process inside Ulanzi Studio.  Studio loads it via 
 ## Quickstart
 
 1. **Enable TCI** in AetherSDR — *Settings → Autostart TCI with AetherSDR*.
-2. **Download** `aethersdr-ulanzi-plugin-v0.1.0.zip` from the [latest Release](https://github.com/nigelfenton/aethersdr-ulanzi-plugin/releases/latest).
+2. **Download** the plugin ZIP from the [latest Release](https://github.com/nigelfenton/aethersdr-ulanzi-plugin/releases/latest).
 3. **Quit Ulanzi Studio fully** (system tray → Quit).
 4. **Extract** the `com.g0jkn.aethersdr.ulanziPlugin` folder from the ZIP into Ulanzi Studio's plugin directory:
    - Windows: `%APPDATA%\Ulanzi\UlanziDeck\Plugins\`
    - macOS:   `~/Library/Application Support/Ulanzi/UlanziDeck/Plugins/`
 5. **Launch Ulanzi Studio** — the AetherSDR Controller category appears in the action picker.
 6. **Drag actions** onto your device's keys, or import the bundled D100H layout — Studio Profile menu → Import → pick [`profiles/aethersdr-d100h-default.ulanziDeckProfile`](profiles/README.md) from the extracted folder.
-7. **Make sure AetherSDR is running** so its TCI server is listening on `ws://127.0.0.1:40001` — button presses are silently dropped otherwise.
+7. **Make sure AetherSDR is running** so its TCI server is listening on `ws://127.0.0.1:50001` — button presses are silently dropped otherwise.
 
 If button presses don't reach the radio, double-check Bluetooth is on and your device is connected (top-left of the Studio window).  If the device just dropped its link, see the [reconnect dance](#reconnecting-the-d100h-after-bluetooth-flap) below.
 
@@ -103,14 +107,14 @@ Build the operator-facing release ZIP with `pwsh scripts/Build-Release.ps1` (Win
 
 ## Status
 
-**Version 0.1.0 — pre-release scaffold.**  Manifest + plugin/app.js + property inspectors stubbed; not yet validated end-to-end with a physical device.  Roadmap:
+**Version 0.1.7** — in sync with the copy bundled in the [AetherSDR tree](https://github.com/aethersdr/AetherSDR/tree/main/plugins/ulanzi-aethersdr), plus the TCI VOLUME dB-scale fix (AetherSDR #3502). Roadmap:
 
-- [ ] First-light smoke test with D100H + AetherSDR running locally
-- [ ] Verify each action sends the right TCI command on press / rotate
-- [ ] Property-inspector settings round-trip (URL override, step sizes)
+- [x] First-light smoke test with D100H + AetherSDR running locally (Windows by G0JKN; macOS by VU2CPL, [#3](https://github.com/nigelfenton/aethersdr-ulanzi-plugin/issues/3))
+- [x] Verify each action sends the right TCI command on press / rotate — AF/RF/Mic/VFO/bands verified; see [#3](https://github.com/nigelfenton/aethersdr-ulanzi-plugin/issues/3) for the TUNE and Mode Cycle fixes in progress
+- [ ] Property-inspector settings round-trip (URL override) — **known broken**, fix in progress under [#3](https://github.com/nigelfenton/aethersdr-ulanzi-plugin/issues/3)
 - [ ] LCD button face state updates (TX/RX colour, current mode display, frequency readout)
-- [ ] macOS testing
-- [ ] Publish to the Ulanzi Studio Marketplace
+- [x] macOS testing (VU2CPL, Sequoia, Studio 3.2.11)
+- [x] Published to the Ulanzi Community Store
 
 ## Troubleshooting
 
@@ -131,7 +135,7 @@ Restart Studio **fully** — system tray → Quit, then relaunch.  Studio scans 
 
 ### Plugin appears but actions don't fire
 
-Open AetherSDR — the plugin maintains a WebSocket connection to its TCI server on `ws://127.0.0.1:40001`.  Without AetherSDR running, commands are silently dropped (`[tci] DROPPED (not connected)` in the plugin log).
+Open AetherSDR — the plugin maintains a WebSocket connection to its TCI server on `ws://127.0.0.1:50001`.  Without AetherSDR running, commands are silently dropped (`[tci] DROPPED (not connected)` in the plugin log).
 
 To see the plugin's live log on Windows:
 ```cmd
