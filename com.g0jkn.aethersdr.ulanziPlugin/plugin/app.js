@@ -189,8 +189,24 @@ function cmdRitToggle()       { return `rit_enable:0,${!radio.ritOn};`; }
 function cmdSetFreq(hz)       { return `vfo:0,0,${hz};`; }
 function cmdSetMode(mode)     { return `modulation:0,${mode};`; }
 
+// AetherSDR reports modulation in lower case (`modulation:0,usb;`), so
+// radio.mode is lower case while MODE_CYCLE is upper. A case-sensitive
+// indexOf() therefore never matched, returned -1, and (-1 + 1) % length == 0
+// pinned the cycle to entry 0: every press jumped the radio to USB instead of
+// advancing, and from USB it looked like the button did nothing at all.
+//
+// Only the comparison was wrong — the tokens are fine. AetherSDR's
+// modulations_list is `usb,lsb,cw,cwr,am,sam,fm,nfm,digu,digl,rtty` and its
+// handler lower-cases the argument before the lookup, so sending the upper-case
+// token straight back is accepted (`modulation:0,LSB;` echoes
+// `modulation:0,lsb;`).
+//
+// Landing on 0 stays the fallback for a mode that is genuinely not in the
+// cycle (`sam`, `rtty`, or `cwr` — which is CW *reverse*, a different mode from
+// `cw`, not a spelling of it).
 function cmdModeNext() {
-  const i = MODE_CYCLE.indexOf(radio.mode);
+  const current = String(radio.mode || '').toLowerCase();
+  const i = MODE_CYCLE.findIndex((m) => m.toLowerCase() === current);
   const next = MODE_CYCLE[(i + 1) % MODE_CYCLE.length];
   return cmdSetMode(next);
 }
