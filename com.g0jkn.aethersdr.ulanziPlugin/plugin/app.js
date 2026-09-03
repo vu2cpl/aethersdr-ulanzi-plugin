@@ -314,13 +314,22 @@ $UD.onClear((jsn) => {
   for (const item of jsn.param) delete ACTION_CACHES[item.context];
 });
 
-$UD.onParamFromPlugin((jsn) => {
-  if (ACTION_CACHES[jsn.context]) ACTION_CACHES[jsn.context].settings = jsn.param || {};
-  if (jsn.param && jsn.param.tci_url) {
-    const url = migrateTciUrl(jsn.param.tci_url);
+function applySettings(context, settings) {
+  if (!settings) return;
+  if (ACTION_CACHES[context]) ACTION_CACHES[context].settings = settings;
+  if (settings.tci_url) {
+    const url = migrateTciUrl(settings.tci_url);
     if (url !== tciUrl) tciConnect(url);
   }
-});
+}
+
+// Live edit in an open inspector.
+$UD.onParamFromPlugin((jsn) => applySettings(jsn.context, jsn.param || {}));
+
+// Settings Studio has persisted — the reply to the inspector's getSettings(),
+// and the echo of its setSettings().  Without this the plugin only ever hears
+// about a URL while the inspector that changed it is still open.
+$UD.onDidReceiveSettings((jsn) => applySettings(jsn.context, jsn.settings || jsn.param));
 
 // Keypad — button press.  Studio sends cmd:'keydown' (not cmd:'run');
 // the SDK's onKeyDown is the right hook.  jsn.uuid carries the action

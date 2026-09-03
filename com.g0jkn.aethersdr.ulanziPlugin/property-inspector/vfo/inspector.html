@@ -27,12 +27,30 @@
     </form>
 
   <script>
-    $UD.onAdd((message) => {
-      Utils.setFormValue(message.param || {}, '#property-inspector');
-    });
+    // The SDK file constructs `$UD` but never calls connect(), and connect() is
+    // what reads the query params (uuid / key / actionid) and opens the socket
+    // to Studio.  Until it runs, `send()` is a no-op — it is guarded by
+    // `this.websocket &&` — so the inspector silently neither loads nor saves:
+    // onAdd never fires, and every change is dropped without an error anywhere.
+    $UD.connect();
 
-    document.getElementById('property-inspector').addEventListener('change', () => {
+    const form = document.getElementById('property-inspector');
+    const fill = (values) => Utils.setFormValue(values || {}, '#property-inspector');
+
+    // Ask Studio for this action's persisted settings as soon as we are up;
+    // the answer arrives as didReceiveSettings.
+    $UD.onConnected(() => $UD.getSettings());
+    $UD.onAdd((message) => fill(message.param));
+    $UD.onDidReceiveSettings((message) => fill(message.settings || message.param));
+
+    form.addEventListener('change', () => {
       const params = Utils.getFormValue('#property-inspector');
+      // Two different jobs, so both calls are needed:
+      //   setSettings()          persists (payload key `settings`)
+      //   sendParamFromPlugin()  forwards to the *running* plugin (key `param`)
+      // Only sending the second is why no inspector field had ever survived a
+      // restart — the value reached the live plugin and was never written down.
+      $UD.setSettings(params);
       $UD.sendParamFromPlugin(params);
     });
   </script>
